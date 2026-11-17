@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>CROCK Trading Simulator — Simulation Monte Carlo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d1117;
+    --surface:#161b22;
+    --surface-2:#1c2333;
+    --border:#2a3142;
+    --text:#c9d1d9;
+    --text-dim:#7d8590;
+    --text-bright:#f0f3f6;
+    --green:#3fb950;
+    --red:#e5534b;
+    --amber:#f2a154;
+    --blue:#4d9fdb;
+    --purple:#c896ff;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif;
+    padding-bottom:60px;
+  }
+  header{
+    max-width:980px; margin:0 auto; padding:32px 24px 20px;
+    border-bottom:1px solid var(--border);
+  }
+  .term-line{
+    font-family:'JetBrains Mono',monospace; font-size:13px;
+    color:var(--text-dim); margin-bottom:6px;
+  }
+  .term-line .prompt{color:var(--green);}
+  h1{
+    font-family:'JetBrains Mono',monospace;
+    font-size:clamp(20px,4vw,30px); color:var(--text-bright);
+    font-weight:800; margin:8px 0 4px; letter-spacing:-0.02em;
+  }
+  .subtitle{color:var(--text-dim); font-size:13.5px; line-height:1.5; max-width:640px;}
+
+  main{max-width:980px; margin:0 auto; padding:24px;}
+
+  .panel{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:20px 22px; margin-bottom:18px;
+  }
+  .panel h2{
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+    color:var(--text-dim); text-transform:uppercase; letter-spacing:0.07em;
+    margin-bottom:16px; display:flex; align-items:center; gap:8px;
+  }
+  .panel h2::before{content:""; width:8px; height:8px; border-radius:2px; background:var(--green); display:inline-block;}
+
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:14px;
+  }
+  .field label{
+    display:block; font-size:12px; color:var(--text-dim);
+    margin-bottom:6px; font-family:'JetBrains Mono',monospace;
+  }
+  .field input{
+    width:100%; background:var(--surface-2); border:1px solid var(--border);
+    color:var(--text-bright); border-radius:6px; padding:9px 10px;
+    font-family:'JetBrains Mono',monospace; font-size:14px;
+  }
+  .field input:focus{outline:none; border-color:var(--green);}
+  .field .hint{font-size:10.5px; color:var(--text-dim); margin-top:4px;}
+
+  .run-btn{
+    margin-top:18px; width:100%;
+    background:linear-gradient(90deg,#3fb950,#2ea043);
+    color:#0d1117; border:none; border-radius:8px;
+    padding:13px; font-family:'JetBrains Mono',monospace;
+    font-weight:700; font-size:14px; cursor:pointer;
+    letter-spacing:0.02em;
+  }
+  .run-btn:hover{filter:brightness(1.08);}
+  .run-btn:active{transform:scale(0.995);}
+
+  .results{display:none;}
+  .results.show{display:block;}
+
+  .stat-grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr));
+    gap:12px; margin-bottom:6px;
+  }
+  .stat{
+    background:var(--surface-2); border:1px solid var(--border);
+    border-radius:8px; padding:13px 15px;
+  }
+  .stat .label{font-size:10.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:0.05em;}
+  .stat .value{font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; color:var(--text-bright); margin-top:5px;}
+  .stat .value.pos{color:var(--green);}
+  .stat .value.neg{color:var(--red);}
+  .stat .sub{font-size:10.5px; color:var(--text-dim); margin-top:3px;}
+
+  .expectancy-banner{
+    display:flex; align-items:center; gap:14px;
+    padding:14px 18px; border-radius:8px; margin-bottom:16px;
+    border:1px solid var(--border);
+  }
+  .expectancy-banner.pos{background:rgba(63,185,80,0.08); border-color:rgba(63,185,80,0.3);}
+  .expectancy-banner.neg{background:rgba(229,83,75,0.08); border-color:rgba(229,83,75,0.3);}
+  .expectancy-banner .big{font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:800;}
+  .expectancy-banner .big.pos{color:var(--green);}
+  .expectancy-banner .big.neg{color:var(--red);}
+  .expectancy-banner .desc{font-size:13px; color:var(--text-dim); line-height:1.5;}
+
+  canvas{width:100%; height:280px; display:block; border-radius:8px;}
+
+  .legend{display:flex; gap:18px; margin-top:10px; flex-wrap:wrap;}
+  .legend span{font-size:11.5px; color:var(--text-dim); display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace;}
+  .legend .dot{width:10px; height:3px; border-radius:2px; display:inline-block;}
+
+  .disclaimer{
+    font-size:12px; color:var(--text-dim); line-height:1.6;
+    border-top:1px solid var(--border); padding-top:16px; margin-top:20px;
+  }
+  .disclaimer strong{color:var(--amber);}
+
+  @media (max-width:600px){ .grid{grid-template-columns:1fr 1fr;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="term-line"><span class="prompt">$</span> launch crock-trading-simulator</div>
+  <h1>CROCK Trading Simulator</h1>
+  <p class="subtitle">Calcule ton espérance mathématique et projette ton capital sur plusieurs mois, à partir de ton winrate, ton ratio risk/reward et ta gestion du risque. Inclut une simulation Monte Carlo pour visualiser la variance réelle (pas juste une moyenne théorique).</p>
+</header>
+
+<main>
+
+  <div class="panel">
+    <h2>Paramètres</h2>
+    <div class="grid">
+      <div class="field">
+        <label>Capital de départ</label>
+        <input type="number" id="capital" value="1000" min="1">
+        <div class="hint">en unité monétaire de ton choix</div>
+      </div>
+      <div class="field">
+        <label>Trades / mois</label>
+        <input type="number" id="tradesPerMonth" value="20" min="1">
+      </div>
+      <div class="field">
+        <label>Durée (mois)</label>
+        <input type="number" id="months" value="6" min="1">
+      </div>
+      <div class="field">
+        <label>Winrate (%)</label>
+        <input type="number" id="winrate" value="45" min="0" max="100" step="0.1">
+      </div>
+      <div class="field">
+        <label>Ratio Risk/Reward (1:X)</label>
+        <input type="number" id="rr" value="2" min="0.1" step="0.1">
+        <div class="hint">ex: 2 = tu gagnes 2x ce que tu risques</div>
+      </div>
+      <div class="field">
+        <label>Risque par trade (% capital)</label>
+        <input type="number" id="riskPct" value="1" min="0.01" step="0.1">
+      </div>
+      <div class="field">
+        <label>Frais par trade (fixe)</label>
+        <input type="number" id="fee" value="0" min="0" step="0.01">
+        <div class="hint">spread/commission, optionnel</div>
+      </div>
+      <div class="field">
+        <label>Nb de simulations Monte Carlo</label>
+        <input type="number" id="nSims" value="300" min="10" max="2000">
+      </div>
+    </div>
+    <button class="run-btn" id="runBtn">▶ Lancer la simulation</button>
+  </div>
+
+  <div class="results" id="results">
+
+    <div id="expectancyBanner" class="expectancy-banner">
+      <div>
+        <div class="label" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-dim);text-transform:uppercase;">Espérance / trade</div>
+        <div class="big" id="expectancyR">—</div>
+      </div>
+      <div class="desc" id="expectancyDesc">—</div>
+    </div>
+
+    <div class="panel">
+      <h2>Résultats de la simulation (moyenne sur N scénarios)</h2>
+      <div class="stat-grid">
+        <div class="stat"><div class="label">Capital final moyen</div><div class="value" id="finalAvg">—</div></div>
+        <div class="stat"><div class="label">Capital final médian</div><div class="value" id="finalMedian">—</div></div>
+        <div class="stat"><div class="label">Meilleur scénario</div><div class="value pos" id="finalBest">—</div></div>
+        <div class="stat"><div class="label">Pire scénario</div><div class="value neg" id="finalWorst">—</div></div>
+        <div class="stat"><div class="label">Drawdown moyen</div><div class="value neg" id="avgDD">—</div></div>
+        <div class="stat"><div class="label">% scénarios gagnants</div><div class="value" id="pctWin">—</div></div>
+        <div class="stat"><div class="label">Risque de perte &gt; 50%</div><div class="value neg" id="ruinRisk">—</div></div>
+        <div class="stat"><div class="label">Total trades simulés</div><div class="value" id="totalTrades">—</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Courbe d'équité (sur l'ensemble des trades)</h2>
+      <canvas id="chart"></canvas>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--green)"></span> moyenne</span>
+        <span><span class="dot" style="background:var(--blue)"></span> médiane</span>
+        <span><span class="dot" style="background:var(--text-dim)"></span> zone 10e-90e percentile</span>
+        <span><span class="dot" style="background:var(--red)"></span> pire scénario</span>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      <strong>⚠ À lire :</strong> cet outil est une simulation mathématique éducative basée sur des tirages aléatoires (winrate constant, pas de série corrélée). Les marchés réels ajoutent du slippage, des frais variables, des séries de pertes psychologiquement difficiles à tenir, et un winrate qui n'est jamais parfaitement stable. Ne considère jamais ces résultats comme une promesse de gain réel — ceci n'est pas un conseil financier.
+    </div>
+  </div>
+
+</main>
+
+<script>
+function fmt(n){
+  return n.toLocaleString('fr-FR', {maximumFractionDigits:2});
+}
+
+function runSimulation(){
+  const capital0 = parseFloat(document.getElementById('capital').value) || 1000;
+  const tradesPerMonth = parseInt(document.getElementById('tradesPerMonth').value) || 20;
+  const months = parseInt(document.getElementById('months').value) || 6;
+  const winrate = (parseFloat(document.getElementById('winrate').value) || 0) / 100;
+  const rr = parseFloat(document.getElementById('rr').value) || 1;
+  const riskPct = (parseFloat(document.getElementById('riskPct').value) || 1) / 100;
+  const fee = parseFloat(document.getElementById('fee').value) || 0;
+  const nSims = Math.min(2000, Math.max(10, parseInt(document.getElementById('nSims').value) || 300));
+
+  const totalTrades = tradesPerMonth * months;
+
+  // Espérance mathématique en unités R
+  const expectancyR = (winrate * rr) - (1 - winrate);
+  const expBanner = document.getElementById('expectancyBanner');
+  const expR = document.getElementById('expectancyR');
+  const expDesc = document.getElementById('expectancyDesc');
+  expBanner.className = 'expectancy-banner ' + (expectancyR >= 0 ? 'pos' : 'neg');
+  expR.className = 'big ' + (expectancyR >= 0 ? 'pos' : 'neg');
+  expR.textContent = (expectancyR >= 0 ? '+' : '') + expectancyR.toFixed(3) + ' R';
+  expDesc.textContent = expectancyR >= 0
+    ? `En moyenne, chaque trade te rapporte ${(expectancyR*100).toFixed(1)}% du montant risqué. Sur le long terme, ta stratégie est mathématiquement gagnante — à condition de la tenir avec discipline.`
+    : `En moyenne, chaque trade te coûte ${Math.abs(expectancyR*100).toFixed(1)}% du montant risqué. Avec ce winrate et ce ratio R/R, ta stratégie perd de l'argent sur le long terme, même si certains mois peuvent sembler positifs.`;
+
+  // Monte Carlo
+  const curves = [];
+  const maxDDs = [];
+  for(let s=0; s<nSims; s++){
+    let capital = capital0;
+    let peak = capital0;
+    let maxDD = 0;
+    const curve = new Float64Array(totalTrades+1);
+    curve[0] = capital;
+    for(let t=1; t<=totalTrades; t++){
+      const win = Math.random() < winrate;
+      const riskAmount = capital * riskPct;
+      capital += win ? riskAmount * rr : -riskAmount;
+      capital -= fee;
+      if(capital < 0) capital = 0;
+      peak = Math.max(peak, capital);
+      const dd = peak > 0 ? (peak - capital) / peak : 0;
+      if(dd > maxDD) maxDD = dd;
+      curve[t] = capital;
+    }
+    curves.push(curve);
+    maxDDs.push(maxDD);
+  }
+
+  // Stats finales
+  const finals = curves.map(c => c[totalTrades]).sort((a,b)=>a-b);
+  const finalAvg = finals.reduce((a,b)=>a+b,0) / nSims;
+  const finalMedian = finals[Math.floor(nSims/2)];
+  const finalBest = finals[finals.length-1];
+  const finalWorst = finals[0];
+  const avgDD = maxDDs.reduce((a,b)=>a+b,0) / nSims;
+  const pctWin = finals.filter(f => f > capital0).length / nSims * 100;
+  const ruinCount = curves.filter(c => Math.min(...c) < capital0*0.5).length;
+  const ruinRisk = ruinCount / nSims * 100;
+
+  document.getElementById('finalAvg').textContent = fmt(finalAvg);
+  document.getElementById('finalAvg').className = 'value ' + (finalAvg>=capital0?'pos':'neg');
+  document.getElementById('finalMedian').textContent = fmt(finalMedian);
+  document.getElementById('finalMedian').className = 'value ' + (finalMedian>=capital0?'pos':'neg');
+  document.getElementById('finalBest').textContent = fmt(finalBest);
+  document.getElementById('finalWorst').textContent = fmt(finalWorst);
+  document.getElementById('avgDD').textContent = (avgDD*100).toFixed(1) + '%';
+  document.getElementById('pctWin').textContent = pctWin.toFixed(0) + '%';
+  document.getElementById('ruinRisk').textContent = ruinRisk.toFixed(0) + '%';
+  document.getElementById('totalTrades').textContent = totalTrades;
+
+  drawChart(curves, capital0, totalTrades);
+
+  document.getElementById('results').classList.add('show');
+}
+
+function drawChart(curves, capital0, totalTrades){
+  const canvas = document.getElementById('chart');
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth || canvas.parentElement.clientWidth;
+  const cssHeight = 280;
+  canvas.width = cssWidth * dpr;
+  canvas.height = cssHeight * dpr;
+  canvas.style.height = cssHeight + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,cssWidth,cssHeight);
+
+  const n = totalTrades + 1;
+  const avg = new Float64Array(n);
+  const median = new Float64Array(n);
+  const p10 = new Float64Array(n);
+  const p90 = new Float64Array(n);
+  const worst = new Float64Array(n);
+
+  for(let t=0; t<n; t++){
+    const vals = curves.map(c => c[t]).sort((a,b)=>a-b);
+    const s = vals.reduce((a,b)=>a+b,0);
+    avg[t] = s / vals.length;
+    median[t] = vals[Math.floor(vals.length/2)];
+    p10[t] = vals[Math.floor(vals.length*0.1)];
+    p90[t] = vals[Math.floor(vals.length*0.9)];
+    worst[t] = vals[0];
+  }
+
+  let minY = Math.min(...worst, capital0);
+  let maxY = Math.max(...p90, capital0);
+  const pad = (maxY-minY)*0.08 || maxY*0.1 || 1;
+  minY -= pad; maxY += pad;
+  if(minY < 0) minY = 0;
+
+  const marginL = 60, marginR = 14, marginT = 14, marginB = 24;
+  const plotW = cssWidth - marginL - marginR;
+  const plotH = cssHeight - marginT - marginB;
+
+  const xOf = t => marginL + (t/(n-1)) * plotW;
+  const yOf = v => marginT + plotH - ((v-minY)/(maxY-minY)) * plotH;
+
+  // grid + y labels
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillStyle = '#7d8590';
+  ctx.font = '10px JetBrains Mono, monospace';
+  ctx.textAlign = 'right';
+  const gridLines = 4;
+  for(let i=0; i<=gridLines; i++){
+    const v = minY + (maxY-minY)*(i/gridLines);
+    const y = yOf(v);
+    ctx.beginPath(); ctx.moveTo(marginL, y); ctx.lineTo(cssWidth-marginR, y); ctx.stroke();
+    ctx.fillText(fmt(v), marginL-8, y+3);
+  }
+
+  // reference line at capital0
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(marginL, yOf(capital0)); ctx.lineTo(cssWidth-marginR, yOf(capital0)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  function drawLine(arr, color, width, dash){
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    if(dash) ctx.setLineDash(dash); else ctx.setLineDash([]);
+    for(let t=0; t<n; t++){
+      const x = xOf(t), y = yOf(arr[t]);
+      if(t===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // percentile band
+  ctx.beginPath();
+  for(let t=0; t<n; t++){ const x=xOf(t), y=yOf(p90[t]); if(t===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+  for(let t=n-1; t>=0; t--){ const x=xOf(t), y=yOf(p10[t]); ctx.lineTo(x,y); }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(125,133,144,0.12)';
+  ctx.fill();
+
+  drawLine(worst, '#e5534b', 1.3, [3,3]);
+  drawLine(median, '#4d9fdb', 1.6);
+  drawLine(avg, '#3fb950', 2);
+
+  // x label
+  ctx.fillStyle = '#7d8590';
+  ctx.textAlign = 'left';
+  ctx.fillText('trade 0', marginL, cssHeight-6);
+  ctx.textAlign = 'right';
+  ctx.fillText('trade ' + totalTrades, cssWidth-marginR, cssHeight-6);
+}
+
+document.getElementById('runBtn').addEventListener('click', runSimulation);
+window.addEventListener('resize', () => {
+  if(document.getElementById('results').classList.contains('show')) runSimulation();
+});
+
+// première exécution automatique avec les valeurs par défaut
+runSimulation();
+</script>
+</body>
+</html>
